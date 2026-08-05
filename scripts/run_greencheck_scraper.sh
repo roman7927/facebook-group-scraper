@@ -28,4 +28,17 @@ export GREENCHECK_API_SCHEMA_VERSION="${GREENCHECK_API_SCHEMA_VERSION:-1.0}"
 
 cd "$PROJECT_DIR"
 print -r -- "$(date '+%Y-%m-%dT%H:%M:%S%z') starting scraper cycle" >> "$LOG_DIR/scraper.log"
+api_health="${GREENCHECK_API_BASE_URL%/}/health"
+api_ready=0
+for attempt in {1..30}; do
+  if /usr/bin/curl --fail --silent --show-error --max-time 3 "$api_health" >/dev/null 2>&1; then
+    api_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$api_ready" -ne 1 ]]; then
+  print -r -- "$(date '+%Y-%m-%dT%H:%M:%S%z') error: Green Check API tunnel unavailable" >> "$LOG_DIR/scraper.log"
+  exit 1
+fi
 "$VENV_PYTHON" main3.py >> "$LOG_DIR/scraper.log" 2>> "$LOG_DIR/scraper-error.log"
