@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.greencheck.facebook-scraper</string>
+  <key>ProgramArguments</key><array><string>/Users/rrodichev/Projects/fbscraper/github-scraper/scripts/run_greencheck_scraper.sh</string></array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>/Users/rrodichev/Projects/fbscraper/github-scraper/logs/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/rrodichev/Projects/fbscraper/github-scraper/logs/launchd-error.log</string>
+</dict></plist>
