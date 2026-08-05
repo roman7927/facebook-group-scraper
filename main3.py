@@ -1502,10 +1502,27 @@ def main():
             pass
         page = context.new_page()
         if health:
-            page.goto("https://www.facebook.com/", wait_until="domcontentloaded", timeout=60_000)
-            health.set_browser_status(
-                "logged_out" if page.get_by_text("Log In", exact=True).count() else "healthy"
-            )
+            try:
+                page.goto(
+                    "https://www.facebook.com/",
+                    wait_until="domcontentloaded",
+                    timeout=60_000,
+                )
+            except PlaywrightTimeoutError:
+                # Facebook can leave document loading open while the rendered
+                # application is already usable. This probe reports health;
+                # each source still has its own strict navigation timeout and
+                # terminal outcome, so a probe timeout must not abort a cycle.
+                pass
+            try:
+                logged_out = page.get_by_text("Log In", exact=True).count() > 0
+                on_facebook = page.url.startswith("https://www.facebook.com/")
+                health.set_browser_status(
+                    "logged_out" if logged_out else
+                    "healthy" if on_facebook else "unhealthy"
+                )
+            except Exception:
+                health.set_browser_status("unhealthy")
 
         for source in sources:
             group_id = source["group_id"]
