@@ -3,6 +3,7 @@ import time
 import unittest
 from pathlib import Path
 
+from greencheck_adapter import MAX_BATCH_RECORDS, build_payloads
 from greencheck_health import HealthReporter
 from greencheck_queue import OutboundQueue
 
@@ -82,6 +83,45 @@ class GreenCheckReliabilityTests(unittest.TestCase):
         self.assertEqual(outcome["status"], "succeeded")
         self.assertEqual(outcome["posts_discovered"], 4)
         self.assertEqual(outcome["comments_discovered"], 7)
+
+    def test_snapshot_is_split_into_stable_post_comment_batches(self):
+        source = {
+            "group_id": "group-key", "group_name": "Test Group",
+            "group_url": "https://www.facebook.com/groups/test/",
+            "facebook_source_type": "group", "scrape_enabled": True,
+        }
+        posts = [
+            {"group_id": "group-key", "group_name": "Test Group",
+             "post_id": str(1000 + index), "post_text": f"post {index}"}
+            for index in range(300)
+        ]
+        comments = [
+            {"group_id": "group-key", "group_name": "Test Group",
+             "post_id": str(1000 + index), "comment_text": f"comment {index}"}
+            for index in range(300)
+        ]
+
+        first = build_payloads(posts, comments, "client", "test", [source])
+        second = build_payloads(posts, comments, "client", "test", [source])
+
+        self.assertEqual(len(first), 2)
+        self.assertEqual(
+            [batch_id for batch_id, _ in first],
+            [batch_id for batch_id, _ in second],
+        )
+        for _, payload in first:
+            self.assertLessEqual(
+                len(payload["posts"]) + len(payload["comments"]),
+                MAX_BATCH_RECORDS,
+            )
+            post_keys = {
+                (post["group_id"], post["post_id"])
+                for post in payload["posts"]
+            }
+            self.assertTrue(all(
+                (comment["group_id"], comment["post_id"]) in post_keys
+                for comment in payload["comments"]
+            ))
 
 
 if __name__ == "__main__":

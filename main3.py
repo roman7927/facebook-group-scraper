@@ -10,7 +10,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from xlsxwriter import Workbook as XlsxWriterWorkbook
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
-from greencheck_adapter import build_payload
+from greencheck_adapter import build_payloads
 from greencheck_client import GreenCheckClient, GreenCheckError
 from greencheck_queue import OutboundQueue
 from greencheck_sources import load_sources
@@ -1614,8 +1614,12 @@ def main():
         # The server deduplicates stable Facebook IDs. Sending the local
         # workbook snapshot bootstraps an empty server safely, then keeps it
         # converged while local delivery state is being established.
-        batch_id, payload = build_payload(final_posts, final_comments, greencheck.client_id, "0.1.0", sources)
-        queue.enqueue(batch_id, payload)
+        payloads = build_payloads(
+            final_posts, final_comments, greencheck.client_id, "0.1.0", sources
+        )
+        for batch_id, payload in payloads:
+            queue.enqueue(batch_id, payload)
+        print(f"Queued {len(payloads)} stable Green Check batch(es).")
         for pending_id, raw, attempts in queue.pending():
             try:
                 result = greencheck.ingest(__import__("json").loads(raw))
