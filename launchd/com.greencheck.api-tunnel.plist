@@ -15,7 +15,7 @@
     <string>root@174.138.54.153</string>
   </array>
   <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><dict><key>NetworkState</key><true/></dict>
+  <key>KeepAlive</key><true/>
   <key>ProcessType</key><string>Background</string>
   <key>ThrottleInterval</key><integer>10</integer>
   <key>StandardOutPath</key><string>/Users/rrodichev/Projects/fbscraper/github-scraper/logs/tunnel.log</string>
