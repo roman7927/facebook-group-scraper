@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=rrodichev
-ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=yes -i /home/rrodichev/.ssh/greencheck_deploy -L 127.0.0.1:18000:127.0.0.1:8000 root@174.138.54.153
+ExecStart=/usr/bin/ssh -NT -p 2222 -o BatchMode=yes -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=yes -i /home/rrodichev/.ssh/greencheck_deploy -L 127.0.0.1:18000:127.0.0.1:8000 root@174.138.54.153
 Restart=always
 RestartSec=10
 

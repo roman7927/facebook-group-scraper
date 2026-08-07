@@ -2,7 +2,7 @@
 
 The home Facebook scraper runs on the Linux VM as two systemd units:
 
-- `greencheck-api-tunnel.service` maintains a loopback-only SSH tunnel to the Green Check API on the droplet.
+- `greencheck-api-tunnel.service` maintains a loopback-only SSH tunnel to the Green Check API on the droplet. It uses the droplet's key-only alternate SSH listener on port 2222 because the home network blocks outbound port 22.
 - `greencheck-facebook-scraper.timer` starts one scraper cycle every hour and catches up after a VM reboot.
 
 The VM never connects directly to PostgreSQL. All configuration, heartbeats, source outcomes, and record batches use the signed `/api/v1/scraper` contract through `127.0.0.1:18000`.
