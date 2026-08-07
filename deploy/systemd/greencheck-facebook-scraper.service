@@ -1,0 +1,15 @@
+[Unit]
+Description=Green Check Facebook scraper cycle
+After=network-online.target greencheck-api-tunnel.service
+Wants=network-online.target greencheck-api-tunnel.service
+
+[Service]
+Type=oneshot
+User=rrodichev
+WorkingDirectory=/opt/greencheck-facebook-scraper
+Environment=GREEN_CHECK_SCRAPER_DIR=/opt/greencheck-facebook-scraper
+ExecStart=/opt/greencheck-facebook-scraper/scripts/run_greencheck_scraper_linux.sh
+StandardOutput=append:/opt/greencheck-facebook-scraper/logs/scraper.log
+StandardError=append:/opt/greencheck-facebook-scraper/logs/scraper-error.log
+TimeoutStartSec=50min
+Nice=10

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Green Check Facebook scraper hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=1min
+Unit=greencheck-facebook-scraper.service
+
+[Install]
+WantedBy=timers.target
