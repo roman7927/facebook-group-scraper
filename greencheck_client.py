@@ -53,6 +53,7 @@ class GreenCheckClient:
 
     def config(self): return self.request("GET", "/api/v1/scraper/config")[1]
     def state(self): return self.request("GET", "/api/v1/scraper/state")[1]
+    def media_backfill(self): return self.request("GET", "/api/v1/scraper/media-backfill")[1]
     def ingest(self, payload): return self.request("POST", "/api/v1/scraper/ingest", payload)[1]
     def heartbeat(self, payload): return self.request("POST", "/api/v1/scraper/heartbeat", payload)[1]
     def batch(self, batch_id): return self.request("GET", f"/api/v1/scraper/batches/{batch_id}")[1]
