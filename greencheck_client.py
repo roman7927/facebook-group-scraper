@@ -1,5 +1,4 @@
 """Signed HTTP client for the Green Check scraper API; never handles Facebook credentials."""
-import base64
 import hashlib
 import hmac
 import json
@@ -22,7 +21,7 @@ def utc_now():
 
 def sign(secret, timestamp, nonce, method, path, body):
     body_hash = hashlib.sha256(body).hexdigest()
-    canonical = "\n".join((timestamp, nonce, method.upper(), path, body_hash))
+    canonical = f"{timestamp}\n{nonce}\n{method.upper()}\n{path}\n{body_hash}"
     return hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
 
 
@@ -31,7 +30,7 @@ class GreenCheckClient:
         self.base_url = (base_url or os.getenv("GREENCHECK_API_BASE_URL", "")).rstrip("/")
         self.client_id = client_id or os.getenv("GREENCHECK_API_CLIENT_ID", "roman-home-facebook-scraper")
         self.secret = secret or os.getenv("GREENCHECK_API_SECRET", "")
-        self.schema_version = schema_version or os.getenv("GREENCHECK_API_SCHEMA_VERSION", "1.0")
+        self.schema_version = schema_version or os.getenv("GREENCHECK_API_SCHEMA_VERSION", "1.1")
         self.timeout = int(timeout or os.getenv("GREENCHECK_API_TIMEOUT_SECONDS", "30"))
         if not self.base_url or not self.secret:
             raise ValueError("Green Check requires GREENCHECK_API_BASE_URL and GREENCHECK_API_SECRET")

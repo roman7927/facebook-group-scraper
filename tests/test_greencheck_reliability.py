@@ -123,6 +123,24 @@ class GreenCheckReliabilityTests(unittest.TestCase):
                 for comment in payload["comments"]
             ))
 
+    def test_media_metadata_is_serialized_and_stable(self):
+        source = {
+            "group_id": "group-key", "group_name": "Test Group",
+            "group_url": "https://www.facebook.com/groups/test/",
+        }
+        post = {
+            "group_id": "group-key", "group_name": "Test Group", "post_id": "1000",
+            "post_text": "", "has_text": False, "has_image": True,
+            "attachment_count": 1, "content_type": "image_only",
+        }
+        first = build_payloads([post], [], "client", "test", [source])
+        second = build_payloads([post], [], "client", "test", [source])
+        self.assertEqual(first[0][0], second[0][0])
+        payload = first[0][1]
+        self.assertEqual(payload["schema_version"], "1.1")
+        self.assertEqual(payload["posts"][0]["content_type"], "image_only")
+        self.assertTrue(payload["posts"][0]["has_image"])
+
 
 if __name__ == "__main__":
     unittest.main()

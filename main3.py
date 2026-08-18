@@ -264,7 +264,49 @@ ACTION_SCAN_JS = r"""
       .filter(isRendered)
       .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
     const message = messages[0] || null;
-    const text = clean(message?.innerText) || '[Post without text]';
+    // `story_message` contains authored text, but Facebook appends its own
+    // expansion affordance. It is not authored content.
+    const text = clean(message?.innerText).replace(/\bSee (?:more|less)\b/gi, '').trim();
+    const hasText = Boolean(text);
+
+    // Only inspect rendered descendants of this outer feed unit. Header images
+    // before the menu are avatars; small graphics are reactions/emoji/chrome.
+    const isHeader = element => before(element, action);
+    let imageElements = [], videoElements = [], previewLinks = [], genericAttachments = [];
+    let mediaDetectionUncertain = false;
+    try {
+      imageElements = [...unit.querySelectorAll('img')].filter(image => {
+        if (!isRendered(image) || isHeader(image)) return false;
+        const rect = image.getBoundingClientRect();
+        const label = clean(image.alt || image.getAttribute('aria-label'));
+        if (/^(?:like|love|care|haha|wow|sad|angry)$/i.test(label)) return false;
+        if (/emoji|reaction|avatar|profile picture/i.test(label)) return false;
+        return rect.width >= 80 && rect.height >= 80;
+      });
+      videoElements = [...unit.querySelectorAll('video, [role="button"][aria-label*="video" i], [aria-label*="reel" i], a[href*="/reel/"]')]
+        .filter(element => isRendered(element) && !isHeader(element));
+      previewLinks = links.filter(link => {
+        if (isHeader(link)) return false;
+        const href = String(link.href || '');
+        const label = clean(link.getAttribute('aria-label'));
+        return /facebook\.com\/l\.php\?u=|^https?:\/\/(?!www\.facebook\.com)/i.test(href) ||
+          /link preview/i.test(label);
+      });
+      genericAttachments = [...unit.querySelectorAll('iframe, object, embed, [aria-label*="attachment" i]')]
+        .filter(element => isRendered(element) && !isHeader(element));
+    } catch (_) {
+      mediaDetectionUncertain = true;
+    }
+    const hasImage = imageElements.length > 0;
+    const hasVideo = videoElements.length > 0;
+    const hasLinkPreview = previewLinks.length > 0;
+    const attachmentCount = imageElements.length + videoElements.length + previewLinks.length +
+      genericAttachments.length;
+    const contentType = mediaDetectionUncertain ? 'unknown' :
+      hasVideo ? (hasText ? 'text_with_video' : 'video_only') :
+      hasLinkPreview ? (hasText ? 'text_with_link' : 'link') :
+      hasImage ? (hasText ? 'text_with_image' : 'image_only') :
+      genericAttachments.length ? 'attachment_only' : hasText ? 'text' : 'empty';
 
     let posterUrl = '';
     if (!poster.toLowerCase().startsWith('anonymous')) {
@@ -335,6 +377,13 @@ ACTION_SCAN_JS = r"""
       time_marker: timeMarker,
       direct_url: directUrl,
       text,
+      has_text: hasText,
+      has_image: hasImage,
+      has_video: hasVideo,
+      has_link_preview: hasLinkPreview,
+      attachment_count: attachmentCount,
+      content_type: contentType,
+      media_detection_uncertain: mediaDetectionUncertain,
       poster,
       poster_url: posterUrl,
       post_time: postTime,
@@ -1237,6 +1286,7 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
     stable_scans = 0
     no_order_change = 0
     unresolved_attempts = {}
+    media_diagnostics = 0
     deadline = datetime.now().timestamp() + SOURCE_TIMEOUT_SECONDS
 
     def is_known(post_id):
@@ -1324,15 +1374,28 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
                     f"timestamp: {preview!r}. Workbook was not changed."
                 )
 
+            if raw.get("media_detection_uncertain") and media_diagnostics < 10:
+                media_diagnostics += 1
+                print(
+                    f"Media detection uncertain for post {post_id}; "
+                    "uploading content_type=unknown."
+                )
+
             row = {
                 "group_id": group_id,
                 "group_name": group_name,
                 "post_id": post_id,
                 "post_datetime": facebook_datetime(raw.get("post_time"), now),
-                "post_text": clean_text(raw.get("text")) or "[Post without text]",
+                "post_text": clean_text(raw.get("text")),
                 "displayed_poster": clean_text(raw.get("poster")),
                 "poster_url": raw.get("poster_url", ""),
                 "post_url": post_url,
+                "has_text": bool(raw.get("has_text")),
+                "has_image": bool(raw.get("has_image")),
+                "has_video": bool(raw.get("has_video")),
+                "has_link_preview": bool(raw.get("has_link_preview")),
+                "attachment_count": max(0, int(raw.get("attachment_count") or 0)),
+                "content_type": cell_text(raw.get("content_type")) or "unknown",
             }
 
             if post_id in rows_by_id:
