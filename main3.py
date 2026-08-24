@@ -1578,7 +1578,14 @@ def main():
                 # terminal outcome, so a probe timeout must not abort a cycle.
                 pass
             try:
-                logged_out = page.get_by_text("Log In", exact=True).count() > 0
+                # Facebook retains hidden "Log In" hydration/footer text in a
+                # valid authenticated DOM. Treat only a visible login form or
+                # an actual login URL as an expired browser session.
+                login_form = page.locator("input[name='email'], input[name='pass']")
+                logged_out = (
+                    "/login" in page.url.lower()
+                    or login_form.first.is_visible(timeout=1000)
+                )
                 on_facebook = page.url.startswith("https://www.facebook.com/")
                 health.set_browser_status(
                     "logged_out" if logged_out else
