@@ -6,6 +6,11 @@ from pathlib import Path
 from greencheck_adapter import MAX_BATCH_RECORDS, build_payloads
 from greencheck_health import HealthReporter
 from greencheck_queue import OutboundQueue
+from main3 import (
+    INCREMENTAL_POST_LIMIT,
+    SOURCE_TIMEOUT_SECONDS,
+    confirmed_boundary_end,
+)
 
 
 class FakeClient:
@@ -83,6 +88,54 @@ class GreenCheckReliabilityTests(unittest.TestCase):
         self.assertEqual(outcome["status"], "succeeded")
         self.assertEqual(outcome["posts_discovered"], 4)
         self.assertEqual(outcome["comments_discovered"], 7)
+
+    def test_boundary_allows_interleaved_new_posts_without_dropping_them(self):
+        group_id = "group-key"
+        known_keys = {
+            f"id:{group_id}:known-one",
+            f"id:{group_id}:known-two",
+            f"id:{group_id}:known-three",
+        }
+        order = [
+            "new-one",
+            "known-one",
+            "new-two",
+            "known-two",
+            "known-three",
+            "older-known",
+        ]
+
+        boundary = confirmed_boundary_end(order, known_keys, group_id)
+
+        self.assertEqual(boundary, 5)
+        self.assertEqual(
+            [
+                post_id
+                for post_id in order[:boundary]
+                if f"id:{group_id}:{post_id}" not in known_keys
+            ],
+            ["new-one", "new-two"],
+        )
+
+    def test_boundary_requires_three_distinct_stored_posts(self):
+        group_id = "group-key"
+        known_keys = {
+            f"id:{group_id}:known-one",
+            f"id:{group_id}:known-two",
+            f"id:{group_id}:known-three",
+        }
+
+        self.assertIsNone(
+            confirmed_boundary_end(
+                ["new-one", "known-one", "new-two", "known-two"],
+                known_keys,
+                group_id,
+            )
+        )
+
+    def test_busy_source_has_time_to_reach_incremental_cap(self):
+        self.assertEqual(INCREMENTAL_POST_LIMIT, 50)
+        self.assertGreaterEqual(SOURCE_TIMEOUT_SECONDS, 600)
 
     def test_snapshot_is_split_into_stable_post_comment_batches(self):
         source = {

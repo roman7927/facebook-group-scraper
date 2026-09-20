@@ -9,6 +9,14 @@ The VM never connects directly to PostgreSQL. All configuration, heartbeats, sou
 
 Runtime files in `/opt/greencheck-facebook-scraper` include `.env`, `facebook_state.json`, the configuration cache, workbook, and durable outbound queue. These files are not committed. The systemd service uses `flock` to prevent overlapping cycles.
 
+Incremental collection confirms a stored-post boundary after three distinct
+stored posts are visible. The confirmations may have pinned or newly ranked
+posts between them; every unseen post through the final confirmation remains
+eligible for collection. A progressing source has a bounded ten-minute ceiling,
+while the no-progress and maximum-scroll guards stop stalled feeds earlier. A
+source still refuses partial data unless it reaches the confirmed boundary or
+the 50-new-post cap.
+
 Useful commands:
 
 ```bash

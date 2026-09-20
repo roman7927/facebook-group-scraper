@@ -46,7 +46,11 @@ COMMENTS_PER_POST_LIMIT = 30
 KNOWN_POSTS_TO_CONFIRM = 3
 MAX_COMMENT_LOAD_ROUNDS = 20
 COMMENT_WAIT_MS = 600
-SOURCE_TIMEOUT_SECONDS = 180
+# Busy groups can require several minutes to reach either the stored-post
+# boundary or the 50-post safety cap.  The no-progress and maximum-scroll
+# guards still stop stalled feeds much sooner; this is the absolute ceiling
+# for a source that continues to make progress.
+SOURCE_TIMEOUT_SECONDS = 600
 
 POST_FIELDS = (
     "group_id", "group_name", "post_id", "post_datetime", "post_text",
@@ -1156,6 +1160,29 @@ def merge_scan_order(order, scan_ids):
     order[:] = list(dict.fromkeys(merged))
 
 
+def confirmed_boundary_end(order, known_keys, group_id):
+    """Return the exclusive end of a safely confirmed stored-post boundary.
+
+    Facebook can interleave pinned or newly ranked posts between older stored
+    posts.  Requiring the confirmations to be consecutive makes a valid
+    boundary disappear even after several stored posts are visible.  Count
+    distinct stored posts instead, and keep every unseen post through the last
+    confirmation so interleaved new posts are never dropped.
+    """
+    required = min(KNOWN_POSTS_TO_CONFIRM, len(known_keys))
+    if required <= 0:
+        return None
+
+    confirmations = 0
+    for index, post_id in enumerate(order):
+        if f"id:{group_id}:{post_id}" not in known_keys:
+            continue
+        confirmations += 1
+        if confirmations >= required:
+            return index + 1
+    return None
+
+
 def write_sheet(workbook, title, rows, spec, keywords):
     sheet = workbook.add_worksheet(title)
     fields = spec["fields"]
@@ -1281,7 +1308,6 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
 
     rows_by_id = {}
     order = []
-    required_known = min(KNOWN_POSTS_TO_CONFIRM, len(known_keys))
     stable_signature = None
     stable_scans = 0
     no_order_change = 0
@@ -1291,19 +1317,6 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
 
     def is_known(post_id):
         return f"id:{group_id}:{post_id}" in known_keys
-
-    def boundary_start():
-        if required_known <= 0:
-            return None
-        run = 0
-        for index, post_id in enumerate(order):
-            if is_known(post_id):
-                run += 1
-                if run >= required_known:
-                    return index - required_known + 1
-            else:
-                run = 0
-        return None
 
     for scan_number in range(1, MAX_SCROLLS + 1):
         if datetime.now().timestamp() >= deadline:
@@ -1421,7 +1434,10 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
             page.wait_for_timeout(WAIT_MS)
             continue
 
-        boundary = boundary_start() if not first_run else None
+        boundary = (
+            confirmed_boundary_end(order, known_keys, group_id)
+            if not first_run else None
+        )
         if first_run:
             signature = tuple(order[:initial_post_limit]) if len(order) >= initial_post_limit else None
             collected = min(len(order), initial_post_limit)
@@ -1491,7 +1507,7 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
             preview = row.get("post_text", "")[:80]
             print(f"  {index}. {row['post_id']} | {preview}")
     else:
-        boundary = boundary_start()
+        boundary = confirmed_boundary_end(order, known_keys, group_id)
         prefix = order[:boundary] if boundary is not None else order
         unseen_ids = [post_id for post_id in prefix if not is_known(post_id)]
         if boundary is None and len(unseen_ids) < INCREMENTAL_POST_LIMIT:
