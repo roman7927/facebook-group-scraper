@@ -65,3 +65,21 @@ does not prove that collection or delivery succeeded.
   on the VM before replacement, then run the wrapper and confirm fresh accepted
   batches and inserted post counts centrally. Last accepted batch before repair
   was `2026-10-01T02:02:34Z`.
+
+### Refreshed-session validation, October 20 Eastern
+
+The user completed Facebook login locally. The new private session was validated
+against a real group on `linuxmgmt` before atomic installation under the existing
+scrape lock; the previous session remains in the recovery backup above.
+
+The manual cycle completed at approximately 10:25 PM Eastern with 150 new posts
+and 503 new comments. Green Check independently confirmed four new batches with
+150 inserted posts, 503 inserted comments and zero rejected records. The final
+signed heartbeat reported a healthy browser and zero pending uploads; the hourly
+timer and API tunnel remain active. Unchanged snapshot batches were deduplicated.
+
+Recovery is partial across sources: Silverleaf, Nocatee and Saint Augustine
+completed; Jacksonville Moms (`1719513988827636`) stopped because it did not reach
+the stored-post boundary before its scan limit. No partial data from that source
+was committed. This remaining source-scanning issue is separate from the expired
+login and must not be described as all four groups succeeding.
