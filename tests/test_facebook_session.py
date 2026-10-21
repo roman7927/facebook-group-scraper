@@ -72,11 +72,11 @@ class FacebookSessionDOMTests(unittest.TestCase):
         page = self.fixture("", "https://www.facebook.com/checkpoint/123")
         with self.assertRaises(FacebookSessionError) as caught:
             require_facebook_session(page)
-        self.assertEqual(caught.exception.status, "unhealthy")
+        self.assertEqual(caught.exception.status, "degraded")
 
-    def test_non_facebook_host_is_unhealthy(self):
+    def test_non_facebook_host_is_degraded(self):
         page = self.fixture("", "https://www.facebook.com.example.org/")
-        self.assertEqual(browser_session_status(page), "unhealthy")
+        self.assertEqual(browser_session_status(page), "degraded")
 
 
 class FacebookSessionWorkflowTests(unittest.TestCase):

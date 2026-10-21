@@ -1607,7 +1607,7 @@ def main():
             try:
                 health.set_browser_status(browser_session_status(page))
             except Exception:
-                health.set_browser_status("unhealthy")
+                health.set_browser_status("degraded")
 
         for source in sources:
             group_id = source["group_id"]

@@ -24,10 +24,10 @@ class FacebookSessionError(RuntimeError):
 def browser_session_status(page):
     url = urlsplit(page.url)
     if url.hostname not in {"facebook.com", "www.facebook.com", "m.facebook.com"}:
-        return "unhealthy"
+        return "degraded"
     path = url.path.lower()
     if path.startswith(("/checkpoint", "/challenge", "/two_step_verification")):
-        return "unhealthy"
+        return "degraded"
     if path.startswith(("/login", "/recover")) or page.locator(LOGIN_INPUT_SELECTOR).count():
         return "logged_out"
     # Hidden hydration inputs and footer text are not evidence of logout.
@@ -40,6 +40,6 @@ def browser_session_status(page):
 
 def require_facebook_session(page):
     status = browser_session_status(page)
-    if status in {"logged_out", "unhealthy"}:
+    if status in {"logged_out", "degraded"}:
         raise FacebookSessionError(status)
     return status

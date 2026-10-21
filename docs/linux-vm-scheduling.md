@@ -34,7 +34,7 @@ The scraper checks rendered login forms on each group and comment page, includin
 forms that appear after navigation. Hidden hydration inputs alone are ignored.
 A Facebook URL alone is not proof of a healthy session. An expired session is
 reported as `logged_out` with a manual-login error in the signed heartbeat and
-source outcomes. Account verification pages report `unhealthy`; do not attempt
+source outcomes. Account verification pages report `degraded`; do not attempt
 to bypass them. A cycle with no successful groups exits nonzero without changing
 the workbook.
 
