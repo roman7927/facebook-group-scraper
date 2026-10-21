@@ -46,3 +46,22 @@ runtime session under `.runtime/scrape.lock`, retaining the previous file as a
 private backup. Never log or commit session contents. Run the existing Linux
 wrapper and confirm fresh accepted batches in Green Check; a heartbeat alone
 does not prove that collection or delivery succeeded.
+
+### 2026-10-21 recovery checkpoint (UTC)
+
+- VM `linuxmgmt` / `192.168.1.16`: deployed integrated main commit
+  `c7ae45f9062ed450a8c9b65637b7a3d5edf4bc1b` from a Git archive under the
+  existing runtime lock. `DEPLOYED_COMMIT` records that revision.
+- Private pre-change backup:
+  `/opt/greencheck-facebook-scraper/.runtime/session-recovery.h5OUgf`.
+  Includes code, original login state, configuration, workbook, and a consistent
+  SQLite queue backup. No queue records or workbook rows were deleted.
+- All 30 offline tests passed on both Mac and VM.
+- The live validation cycle exited 1 with explicit expired-session errors for
+  all four groups; Green Check accepted the signed `logged_out` heartbeat.
+  Workbook checksums matched the backup. The timer and API tunnel stayed active.
+- Collection is **not yet restored** at this checkpoint: a dedicated local
+  login window is awaiting user authentication. Validate the refreshed session
+  on the VM before replacement, then run the wrapper and confirm fresh accepted
+  batches and inserted post counts centrally. Last accepted batch before repair
+  was `2026-10-01T02:02:34Z`.
