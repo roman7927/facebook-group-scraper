@@ -15,6 +15,12 @@ from greencheck_client import GreenCheckClient, GreenCheckError
 from greencheck_queue import OutboundQueue
 from greencheck_sources import load_sources
 from greencheck_health import HealthReporter
+from facebook_session import (
+    FacebookSessionError,
+    POST_ACTION_SELECTOR,
+    browser_session_status,
+    require_facebook_session,
+)
 
 BASE = Path(__file__).resolve().parent
 STATE_FILE = BASE / "facebook_state.json"
@@ -27,7 +33,6 @@ GREENCHECK_CONFIG_CACHE = BASE / "greencheck_config_cache.json"
 POSTS_SHEET = "Posts"
 COMMENTS_SHEET = "Comments"
 POST_SELECTOR = "div[data-ad-rendering-role='story_message']"
-POST_ACTION_SELECTOR = "[aria-label^='Actions for this post by ']"
 COMMENT_SELECTOR = (
     "div[role='article'][aria-label^='Comment by '], "
     "div[role='article'][aria-label^='Reply by ']"
@@ -1234,6 +1239,7 @@ def scrape_post_comments(page, post):
         return []
     page.goto(post["post_url"], wait_until="domcontentloaded", timeout=60_000)
     page.wait_for_timeout(1000)
+    require_facebook_session(page)
     now = datetime.now().astimezone()
 
     exact = extract_creation_times(page).get(str(post.get("post_id", "")))
@@ -1289,9 +1295,13 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
         raise RuntimeError("Configured group URL does not contain a Facebook group path.")
     facebook_scope = scope.group(1)
     page.goto(source_url, wait_until="domcontentloaded", timeout=60_000)
+    require_facebook_session(page)
     try:
         page.locator(POST_ACTION_SELECTOR).first.wait_for(timeout=30_000)
     except PlaywrightTimeoutError:
+        # The form can appear after DOMContentLoaded. Check every visible
+        # input, not only the first (often hidden) hydration input.
+        require_facebook_session(page)
         join_controls = page.get_by_text("Join group", exact=True)
         visible_join = any(
             join_controls.nth(index).is_visible()
@@ -1303,6 +1313,7 @@ def scrape_group(page, source, known_keys, first_run, initial_post_limit):
                 "join approval may be required before posts can be scraped."
             ) from None
         raise
+    require_facebook_session(page)
     page.evaluate("window.scrollTo(0, 0)")
     page.wait_for_timeout(1200)
 
@@ -1594,19 +1605,7 @@ def main():
                 # terminal outcome, so a probe timeout must not abort a cycle.
                 pass
             try:
-                # Facebook retains hidden "Log In" hydration/footer text in a
-                # valid authenticated DOM. Treat only a visible login form or
-                # an actual login URL as an expired browser session.
-                login_form = page.locator("input[name='email'], input[name='pass']")
-                logged_out = (
-                    "/login" in page.url.lower()
-                    or login_form.first.is_visible(timeout=1000)
-                )
-                on_facebook = page.url.startswith("https://www.facebook.com/")
-                health.set_browser_status(
-                    "logged_out" if logged_out else
-                    "healthy" if on_facebook else "unhealthy"
-                )
+                health.set_browser_status(browser_session_status(page))
             except Exception:
                 health.set_browser_status("unhealthy")
 
@@ -1632,11 +1631,14 @@ def main():
             except Exception as error:
                 print(f"Failed group {group_id}: {error}")
                 if health:
+                    if isinstance(error, FacebookSessionError):
+                        health.set_browser_status(error.status)
                     health.fail_source(source, error)
                 continue
 
             successful_groups += 1
             if health:
+                health.set_browser_status("healthy")
                 health.complete_source(source, len(scraped))
 
             if group_name != group_id:
@@ -1665,6 +1667,8 @@ def main():
             except Exception as error:
                 print(f"Failed comments for post {post.get('post_id', '')}: {error}")
                 if health:
+                    if isinstance(error, FacebookSessionError):
+                        health.set_browser_status(error.status)
                     health.source_error(post["group_id"], error)
                 continue
 
@@ -1691,7 +1695,7 @@ def main():
         if health:
             health.stop()
             atexit.unregister(health.stop)
-        return
+        raise SystemExit(1)
 
     # Preserve Facebook feed order. Newly discovered posts are prepended in the
     # exact top-to-bottom order returned by scrape_group; existing spreadsheet

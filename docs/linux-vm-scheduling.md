@@ -27,3 +27,22 @@ sudo journalctl -u greencheck-facebook-scraper.service
 ```
 
 Do not disable the former Mac launchd jobs until a manual Linux cycle has completed, its signed heartbeat and source outcomes appear in Green Check, and the timer survives a VM restart.
+
+## Expired Facebook sessions
+
+The scraper checks rendered login forms on each group and comment page, including
+forms that appear after navigation. Hidden hydration inputs alone are ignored.
+A Facebook URL alone is not proof of a healthy session. An expired session is
+reported as `logged_out` with a manual-login error in the signed heartbeat and
+source outcomes. Account verification pages report `unhealthy`; do not attempt
+to bypass them. A cycle with no successful groups exits nonzero without changing
+the workbook.
+
+To recover, use `login_and_save_state.py` interactively in a private temporary
+directory with `umask 077`. The user must complete login and any Facebook
+verification themselves. Transfer the resulting session over verified SSH to
+the VM, validate authenticated group access there, then atomically replace the
+runtime session under `.runtime/scrape.lock`, retaining the previous file as a
+private backup. Never log or commit session contents. Run the existing Linux
+wrapper and confirm fresh accepted batches in Green Check; a heartbeat alone
+does not prove that collection or delivery succeeded.
